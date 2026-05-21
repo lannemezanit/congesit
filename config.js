@@ -6,18 +6,18 @@
 const CONFIG = {
 
   // --- Azure AD (récupérés sur portal.azure.com) ---
-  clientId:  "VOTRE-APP-ID",         // ID d'application (client)
-  tenantId:  "VOTRE-TENANT-ID",      // ID de l'annuaire (locataire)
+  clientId:  "1b1ab90f-46bc-463d-9edb-e52c4d32c00a",         // ID d'application (client)
+  tenantId:  "e7f2c162-fd33-4911-941e-5d1a32fc5309",      // ID de l'annuaire (locataire)
 
   // --- URI de redirection (doit correspondre à Azure AD) ---
-  redirectUri: window.location.origin + window.location.pathname,
+  redirectUri: "https://github.com/lannemezanit/congesit/",
 
   // --- SharePoint ---
   sharepoint: {
     // URL de votre site SharePoint IT
-    siteUrl:    "https://VOTRETENANT.sharepoint.com/sites/IT",
+    siteUrl:    "https://lannemezan.sharepoint.com/sites/support",
     // Nom du fichier Excel de suivi (dans la bibliothèque Documents)
-    fileName:   "Conges_2025.xlsx",
+    fileName:   "Conges_IT_2026.xlsx",
     // Nom de la feuille dans le fichier Excel
     sheetName:  "Suivi_Congés",
     // Bibliothèque SharePoint
@@ -29,7 +29,7 @@ const CONFIG = {
     // Nom exact du calendrier partagé des absences
     calendarName:  "Absences IT",
     // Email du manager à notifier (cc sur les notifications)
-    managerEmail:  "manager.it@votreentreprise.fr",
+    managerEmail:  "jacques.negrato@mairie-lannemezan.fr",
     // Envoyer une copie au demandeur
     notifyAgent:   true
   },
