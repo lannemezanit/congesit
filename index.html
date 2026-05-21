@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CongesIT — Gestion des congés</title>
+<!-- MSAL.js pour l'authentification Microsoft 365 -->
+<script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F7F6F2;--surface:#FFFFFF;--border:#E8E5DE;--border2:#D4CFBF;
+  --text:#1A1916;--muted:#6B6858;--subtle:#9B9885;
+  --accent:#2D6A4F;--accent-light:#E8F5EE;--accent-mid:#52B788;
+  --warn:#B5451B;--warn-light:#FDEEE9;
+  --pending:#7B5EA7;--pending-light:#F0EBFA;
+  --blue:#1B5FA8;--blue-light:#E8F0FB;
+  --radius:10px;--radius-sm:6px;
+  font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);
+}
+body{background:var(--bg);min-height:100vh}
+.app{display:grid;grid-template-columns:220px 1fr;grid-template-rows:56px 1fr;height:100vh;overflow:hidden}
+/* Topbar */
+.topbar{grid-column:1/-1;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;z-index:10}
+.logo{font-size:15px;font-weight:600;color:var(--accent);display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;background:var(--accent-mid);border-radius:50%}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.m365-badge{background:var(--blue-light);color:var(--blue);font-size:11px;font-weight:500;padding:4px 12px;border-radius:20px;display:flex;align-items:center;gap:6px}
+.m365-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.user-chip{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+/* Sidebar */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:16px 12px;display:flex;flex-direction:column;gap:4px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-weight:400;color:var(--muted);cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--bg);color:var(--text)}
+.nav-item.active{background:var(--accent-light);color:var(--accent);font-weight:500}
+.nav-item i{font-size:16px;width:18px}
+.nav-sep{height:1px;background:var(--border);margin:8px 4px}
+.nav-label{font-size:10px;font-weight:600;color:var(--subtle);letter-spacing:.8px;padding:4px 12px;text-transform:uppercase}
+.count-badge{margin-left:auto;background:var(--pending);color:#fff;font-size:10px;font-weight:600;padding:1px 7px;border-radius:20px}
+/* Main */
+.main{overflow-y:auto;padding:24px;background:var(--bg)}
+.page{display:none}.page.active{display:block}
+/* Headers */
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px}
+.page-title{font-size:18px;font-weight:600;letter-spacing:-.3px}
+.page-sub{font-size:13px;color:var(--muted);margin-top:3px}
+/* Buttons */
+.btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .15s;display:inline-flex;align-items:center;gap:6px;font-family:inherit;text-decoration:none}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}.btn-primary:hover{background:#245B42}
+.btn-outline{background:var(--surface);color:var(--text);border-color:var(--border2)}.btn-outline:hover{background:var(--bg)}
+.btn-danger{background:var(--warn-light);color:var(--warn);border-color:#F5C6B4}.btn-danger:hover{background:#FAD9CC}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:14px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.stat-val{font-size:28px;font-weight:600;letter-spacing:-.5px}
+.stat-lbl{font-size:12px;color:var(--muted);margin-top:3px}
+/* Badges */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px}
+.badge-pending{background:var(--pending-light);color:var(--pending)}
+.badge-approved{background:var(--accent-light);color:var(--accent)}
+.badge-refused{background:var(--warn-light);color:var(--warn)}
+/* Table */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg)}
+/* Form */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+label{font-size:12px;font-weight:500;color:var(--muted)}
+input,select,textarea{padding:8px 12px;border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;background:var(--surface);color:var(--text);outline:none;transition:border .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+input:read-only{background:var(--bg);color:var(--muted)}
+textarea{resize:vertical;min-height:70px}
+/* Notifications */
+.notif{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;margin:12px 0}
+.notif i{font-size:16px;flex-shrink:0;margin-top:1px}
+.notif-success{background:var(--accent-light);border:1px solid #A8D8B8;color:var(--accent)}
+.notif-info{background:var(--blue-light);border:1px solid #B3CCF0;color:var(--blue)}
+.notif-warn{background:var(--warn-light);border:1px solid #F5C6B4;color:var(--warn)}
+.notif-pending{background:var(--pending-light);border:1px solid #D0BEF0;color:var(--pending)}
+/* Calendar */
+.cal-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cal-nav{display:flex;align-items:center;gap:8px}
+.cal-nav button{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-day-name{font-size:10px;font-weight:600;color:var(--subtle);text-align:center;padding:6px 0;text-transform:uppercase;letter-spacing:.5px}
+.cal-day{min-height:36px;border-radius:var(--radius-sm);padding:5px;font-size:12px;text-align:center;position:relative}
+.cal-day.other-month{color:var(--subtle)}
+.cal-day.today{background:var(--accent-light);color:var(--accent);font-weight:600}
+.cal-day.has-pending{background:var(--pending-light)}
+.cal-day.has-approved{background:var(--accent-light)}
+.event-dot{width:4px;height:4px;border-radius:50%;position:absolute;bottom:3px;left:50%;transform:translateX(-50%)}
+/* Agents */
+.agents-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.agent-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center}
+.agent-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;margin:0 auto 10px;color:#fff}
+/* M365 status */
+.m365-action-item{display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border)}
+.m365-action-item:last-child{border-bottom:none}
+.check-icon{width:18px;height:18px;border-radius:4px;background:var(--accent-mid);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+/* Login overlay */
+#login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;text-align:center;max-width:380px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.login-logo{font-size:32px;font-weight:700;color:var(--accent);margin-bottom:8px}
+.login-sub{font-size:14px;color:var(--muted);margin-bottom:28px}
+.btn-microsoft{background:#0078D4;color:#fff;border:none;padding:12px 24px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:10px;font-family:inherit;transition:background .15s;width:100%;justify-content:center}
+.btn-microsoft:hover{background:#006CC1}
+/* Loading */
+.loading{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;padding:20px 0}
+.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay">
+  <div class="login-card">
+    <div class="login-logo">CongesIT</div>
+    <div class="login-sub">Connectez-vous avec votre compte Microsoft 365<br>pour accéder à la gestion des congés</div>
+    <button class="btn-microsoft" onclick="signIn()">
+      <svg width="20" height="20" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#F35325"/><rect x="11" y="1" width="9" height="9" fill="#81BC06"/><rect x="1" y="11" width="9" height="9" fill="#05A6F0"/><rect x="11" y="11" width="9" height="9" fill="#FFBA08"/></svg>
+      Se connecter avec Microsoft
+    </button>
+    <p style="font-size:11px;color:var(--subtle);margin-top:16px">Authentification sécurisée via Microsoft Entra ID</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app">
+  <div class="topbar">
+    <div class="logo"><div class="logo-dot"></div>CongesIT</div>
+    <span style="font-size:12px;color:var(--muted)">Service Informatique</span>
+    <div class="topbar-right">
+      <div class="m365-badge"><div class="m365-dot"></div>Microsoft 365</div>
+      <div class="user-chip">
+        <div class="avatar" id="user-avatar">?</div>
+        <span id="user-name">Chargement...</span>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="signOut()"><i class="ti ti-logout"></i></button>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <span class="nav-label">Navigation</span>
+    <button class="nav-item active" onclick="showPage('dashboard')"><i class="ti ti-layout-dashboard"></i>Tableau de bord</button>
+    <button class="nav-item" onclick="showPage('demande')"><i class="ti ti-plus"></i>Nouvelle demande</button>
+    <button class="nav-item" onclick="showPage('calendrier')"><i class="ti ti-calendar"></i>Calendrier équipe</button>
+    <button class="nav-item" onclick="showPage('validation')">
+      <i class="ti ti-checks"></i>Validation
+      <span class="count-badge hidden" id="pending-count">0</span>
+    </button>
+    <div class="nav-sep"></div>
+    <span class="nav-label">Gestion</span>
+    <button class="nav-item" onclick="showPage('agents')"><i class="ti ti-users"></i>Agents</button>
+    <button class="nav-item" onclick="showPage('m365')"><i class="ti ti-brand-office"></i>Statut M365</button>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <div><div class="page-title">Tableau de bord</div><div class="page-sub" id="dash-sub">Chargement...</div></div>
+        <button class="btn btn-primary btn-sm" onclick="showPage('demande')"><i class="ti ti-plus"></i>Nouvelle demande</button>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-val" style="color:var(--pending)" id="s-pending">—</div><div class="stat-lbl">En attente</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--accent)" id="s-approved">—</div><div class="stat-lbl">Approuvés ce mois</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--blue)" id="s-agents">—</div><div class="stat-lbl">Agents</div></div>
+        <div class="stat-card"><div class="stat-val" id="s-week">—</div><div class="stat-lbl">Absents cette semaine</div></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <span style="font-size:14px;font-weight:500">Dernières demandes</span>
+          <button class="btn btn-outline btn-sm" onclick="showPage('validation')">Gérer</button>
+        </div>
+        <div id="dash-table"><div class="loading"><div class="spinner"></div>Chargement des données...</div></div>
+      </div>
+      <div class="notif notif-info"><i class="ti ti-brand-office"></i><span><strong>Intégration M365 active :</strong> Les congés approuvés créent automatiquement un événement dans le calendrier Outlook "Absences IT" et mettent à jour le fichier Excel SharePoint.</span></div>
+    </div>
+
+    <!-- DEMANDE -->
+    <div id="page-demande" class="page">
+      <div class="page-header">
+        <div><div class="page-title">Nouvelle demande</div><div class="page-sub">Formulaire de demande de congé</div></div>
+      </div>
+      <div class="card">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Agent *</label>
+            <select id="f-agent"><option value="">Sélectionner...</option></select>
+          </div>
+          <div class="form-group">
+            <label>Type de congé *</label>
+            <select id="f-type">
+              <option value="">Sélectionner...</option>
+              <option>Congé annuel</option><option>RTT</option><option>Congé maladie</option>
+              <option>Congé exceptionnel</option><option>Télétravail</option><option>Formation</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date de début *</label>
+            <input type="date" id="f-debut" onchange="calcDuree()">
+          </div>
+          <div class="form-group">
+            <label>Date de fin *</label>
+            <input type="date" id="f-fin" onchange="calcDuree()">
+          </div>
+          <div class="form-group">
+            <label>Période</label>
+            <select id="f-periode">
+              <option>Journée complète</option><option>Matin uniquement</option><option>Après-midi uniquement</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Durée calculée</label>
+            <input type="text" id="f-duree" readonly placeholder="Calculée automatiquement">
+          </div>
+          <div class="form-group full">
+            <label>Motif / Commentaire</label>
+            <textarea id="f-motif" placeholder="Précisions éventuelles..."></textarea>
+          </div>
+        </div>
+        <div id="f-notif" class="hidden"></div>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="btn-submit" onclick="submitDemande()"><i class="ti ti-send"></i>Soumettre la demande</button>
+          <button class="btn btn-outline" onclick="resetForm()"><i class="ti ti-refresh"></i>Réinitialiser</button>
+        </div>
+      </div>
+      <div class="card" style="background:var(--blue-light);border-color:#B3CCF0">
+        <div style="font-size:13px;font-weight:500;color:var(--blue);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="ti ti-brand-office"></i>Actions automatiques après validation</div>
+        <div class="m365-action-item"><div class="check-icon"><i class="ti ti-check" style="font-size:11px;color:#fff"></i></div><span style="font-size:12px;color:var(--blue)">Événement créé dans le calendrier Outlook "Absences IT"</span></div>
+        <div class="m365-action-item"><div class="check-icon"><i class="ti ti-check" style="font-size:11px;color:#fff"></i></div><span style="font-size:12px;color:var(--blue)">Ligne ajoutée dans le fichier Excel SharePoint</span></div>
+        <div class="m365-action-item"><div class="check-icon"><i class="ti ti-check" style="font-size:11px;color:#fff"></i></div><span style="font-size:12px;color:var(--blue)">Email de notification envoyé au manager et à l'agent</span></div>
+      </div>
+    </div>
+
+    <!-- CALENDRIER -->
+    <div id="page-calendrier" class="page">
+      <div class="page-header">
+        <div><div class="page-title">Calendrier équipe</div><div class="page-sub">Absences planifiées du service IT</div></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="badge badge-approved">Approuvé</span>
+          <span class="badge badge-pending">En attente</span>
+        </div>
+      </div>
+      <div class="cal-wrap">
+        <div class="cal-header">
+          <div class="cal-nav">
+            <button onclick="prevMonth()"><i class="ti ti-chevron-left" style="font-size:14px"></i></button>
+            <span style="font-size:15px;font-weight:500;min-width:160px;text-align:center" id="cal-title"></span>
+            <button onclick="nextMonth()"><i class="ti ti-chevron-right" style="font-size:14px"></i></button>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="goToday()">Aujourd'hui</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div style="font-size:13px;font-weight:500;margin-bottom:10px">Absences ce mois</div>
+        <div id="cal-list"></div>
+      </div>
+    </div>
+
+    <!-- VALIDATION -->
+    <div id="page-validation" class="page">
+      <div class="page-header">
+        <div><div class="page-title">Validation</div><div class="page-sub">Demandes en attente de traitement</div></div>
+      </div>
+      <div id="val-container"></div>
+    </div>
+
+    <!-- AGENTS -->
+    <div id="page-agents" class="page">
+      <div class="page-header">
+        <div><div class="page-title">Agents du service</div><div class="page-sub">Soldes de congés — Année en cours</div></div>
+      </div>
+      <div class="agents-grid" id="agents-grid"></div>
+    </div>
+
+    <!-- M365 STATUS -->
+    <div id="page-m365" class="page">
+      <div class="page-header">
+        <div><div class="page-title">Statut Microsoft 365</div><div class="page-sub">Connexion et synchronisations</div></div>
+      </div>
+      <div class="card" style="background:var(--blue-light);border-color:#B3CCF0">
+        <div style="font-size:14px;font-weight:500;color:var(--blue);margin-bottom:14px;display:flex;align-items:center;gap:8px"><i class="ti ti-brand-office" style="font-size:18px"></i>Connexion Microsoft Graph</div>
+        <div id="m365-status"><div class="loading"><div class="spinner"></div>Vérification de la connexion...</div></div>
+        <button class="btn btn-outline btn-sm" style="margin-top:12px" onclick="checkM365Status()"><i class="ti ti-refresh"></i>Rafraîchir le statut</button>
+      </div>
+      <div class="card">
+        <div style="font-size:13px;font-weight:500;margin-bottom:12px">Journal des dernières actions M365</div>
+        <div id="m365-log"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="graph.js"></script>
+<script>
+// ============================================================
+// DATA STORE
+// ============================================================
+let demands = JSON.parse(localStorage.getItem('congesit_demands') || '[]');
+let m365Log = JSON.parse(localStorage.getItem('congesit_log') || '[]');
+let currentUser = null;
+const AGENTS_COLORS = ['#2D6A4F','#1B5FA8','#7B5EA7','#B5451B','#2D6A4F','#1B5FA8','#7B5EA7','#B5451B'];
+const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
+
+function saveDemands() { localStorage.setItem('congesit_demands', JSON.stringify(demands)); }
+function saveLog(entry) {
+  m365Log.unshift({ ...entry, date: new Date().toISOString() });
+  if (m365Log.length > 50) m365Log = m365Log.slice(0, 50);
+  localStorage.setItem('congesit_log', JSON.stringify(m365Log));
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+async function signIn() {
+  try {
+    const res = await Auth.login();
+    currentUser = res;
+    initApp();
+  } catch(e) {
+    console.error('Login error:', e);
+  }
+}
+
+async function signOut() {
+  await Auth.logout();
+  location.reload();
+}
+
+async function initApp() {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('user-name').textContent = currentUser.name || currentUser.username;
+  const initials = (currentUser.name || 'U').split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('user-avatar').textContent = initials;
+  // Load agents from M365
+  await loadAgents();
+  renderDashboard();
+  updatePendingCount();
+}
+
+// ============================================================
+// AGENTS FROM M365
+// ============================================================
+let agentsList = [];
+
+async function loadAgents() {
+  try {
+    const users = await Graph.getGroupMembers();
+    agentsList = users;
+    const sel = document.getElementById('f-agent');
+    sel.innerHTML = '<option value="">Sélectionner un agent...</option>';
+    users.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id;
+      opt.textContent = u.displayName;
+      opt.dataset.email = u.mail;
+      sel.appendChild(opt);
+    });
+  } catch(e) {
+    // Fallback données demo si API indisponible
+    agentsList = [
+      {id:'1',displayName:'Thomas Dupont',mail:'t.dupont@it.local',soldeCP:18,soldeRTT:4},
+      {id:'2',displayName:'Marie Lambert',mail:'m.lambert@it.local',soldeCP:22,soldeRTT:6},
+      {id:'3',displayName:'Kevin Rousseau',mail:'k.rousseau@it.local',soldeCP:14,soldeRTT:3},
+      {id:'4',displayName:'Sarah Benali',mail:'s.benali@it.local',soldeCP:20,soldeRTT:5},
+      {id:'5',displayName:'Antoine Moreau',mail:'a.moreau@it.local',soldeCP:16,soldeRTT:4},
+      {id:'6',displayName:'Lucie Petit',mail:'l.petit@it.local',soldeCP:25,soldeRTT:7},
+    ];
+    const sel = document.getElementById('f-agent');
+    sel.innerHTML = '<option value="">Sélectionner un agent...</option>';
+    agentsList.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id;
+      opt.textContent = u.displayName;
+      opt.dataset.email = u.mail;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showPage(p) {
+  document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
+  document.getElementById('page-' + p).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(b => {
+    if (b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + p + "'")) b.classList.add('active');
+  });
+  if (p === 'dashboard') renderDashboard();
+  if (p === 'calendrier') renderCalendar();
+  if (p === 'validation') renderValidation();
+  if (p === 'agents') renderAgents();
+  if (p === 'm365') { checkM365Status(); renderM365Log(); }
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard() {
+  const now = new Date();
+  const monthDemands = demands.filter(d => {
+    const dd = new Date(d.debut);
+    return dd.getMonth() === now.getMonth() && dd.getFullYear() === now.getFullYear();
+  });
+  const pending = demands.filter(d => d.status === 'pending');
+  const approved = monthDemands.filter(d => d.status === 'approved');
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay() + 1);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 4);
+  const thisWeek = demands.filter(d => d.status === 'approved' && new Date(d.debut) <= weekEnd && new Date(d.fin) >= weekStart);
+
+  document.getElementById('s-pending').textContent = pending.length;
+  document.getElementById('s-approved').textContent = approved.length;
+  document.getElementById('s-agents').textContent = agentsList.length;
+  document.getElementById('s-week').textContent = thisWeek.length;
+  document.getElementById('dash-sub').textContent = `Vue d'ensemble — ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+
+  const last = demands.slice(-8).reverse();
+  if (last.length === 0) {
+    document.getElementById('dash-table').innerHTML = '<p style="font-size:13px;color:var(--muted);padding:12px 0">Aucune demande pour le moment.</p>';
+    return;
+  }
+  document.getElementById('dash-table').innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Agent</th><th>Type</th><th>Dates</th><th>Durée</th><th>Statut</th><th></th></tr></thead>
+    <tbody>${last.map(d => `<tr>
+      <td><strong>${d.agentName}</strong></td>
+      <td>${d.type}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${d.debut}${d.debut !== d.fin ? ' → ' + d.fin : ''}</td>
+      <td>${d.duree}</td>
+      <td>${statusBadge(d.status)}</td>
+      <td>${d.status === 'pending' ? `<button class="btn btn-outline btn-sm" onclick="quickApprove(${d.id})"><i class="ti ti-check"></i></button>` : ''}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function statusBadge(s) {
+  if (s === 'pending') return '<span class="badge badge-pending"><i class="ti ti-clock" style="font-size:10px"></i>En attente</span>';
+  if (s === 'approved') return '<span class="badge badge-approved"><i class="ti ti-check" style="font-size:10px"></i>Approuvé</span>';
+  return '<span class="badge badge-refused"><i class="ti ti-x" style="font-size:10px"></i>Refusé</span>';
+}
+
+function updatePendingCount() {
+  const n = demands.filter(d => d.status === 'pending').length;
+  const el = document.getElementById('pending-count');
+  el.textContent = n;
+  el.classList.toggle('hidden', n === 0);
+}
+
+async function quickApprove(id) {
+  await approuver(id);
+  renderDashboard();
+}
+
+// ============================================================
+// FORM
+// ============================================================
+function calcDuree() {
+  const d1 = document.getElementById('f-debut').value;
+  const d2 = document.getElementById('f-fin').value;
+  if (d1 && d2) {
+    const diff = Math.round((new Date(d2) - new Date(d1)) / (1000*60*60*24)) + 1;
+    document.getElementById('f-duree').value = diff > 0 ? diff + ' jour' + (diff > 1 ? 's' : '') : '—';
+  }
+}
+
+async function submitDemande() {
+  const agentSel = document.getElementById('f-agent');
+  const agentId = agentSel.value;
+  const agentName = agentSel.options[agentSel.selectedIndex]?.text || '';
+  const agentEmail = agentSel.options[agentSel.selectedIndex]?.dataset?.email || '';
+  const type = document.getElementById('f-type').value;
+  const debut = document.getElementById('f-debut').value;
+  const fin = document.getElementById('f-fin').value;
+  const motif = document.getElementById('f-motif').value;
+  const notif = document.getElementById('f-notif');
+
+  if (!agentId || !type || !debut || !fin) {
+    showNotif(notif, 'warn', 'Veuillez remplir tous les champs obligatoires (*).');
+    return;
+  }
+  if (new Date(fin) < new Date(debut)) {
+    showNotif(notif, 'warn', 'La date de fin ne peut pas être antérieure à la date de début.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;border-color:#fff;border-top-color:transparent"></div>Envoi en cours...';
+
+  const diff = Math.round((new Date(fin) - new Date(debut)) / (1000*60*60*24)) + 1;
+  const newDemand = {
+    id: Date.now(),
+    agentId, agentName, agentEmail, type, debut, fin,
+    duree: diff + ' jour' + (diff > 1 ? 's' : ''),
+    motif, status: 'pending',
+    createdAt: new Date().toISOString()
+  };
+
+  demands.push(newDemand);
+  saveDemands();
+  updatePendingCount();
+
+  showNotif(notif, 'success', `Demande soumise pour ${agentName}. Elle est en attente de validation. Après approbation, Outlook et SharePoint seront mis à jour automatiquement.`);
+  resetForm(true);
+  btn.disabled = false;
+  btn.innerHTML = '<i class="ti ti-send"></i>Soumettre la demande';
+}
+
+function showNotif(el, type, msg) {
+  const icons = { success: 'ti-circle-check', warn: 'ti-alert-triangle', info: 'ti-info-circle', pending: 'ti-clock' };
+  el.className = `notif notif-${type}`;
+  el.innerHTML = `<i class="ti ${icons[type] || 'ti-info-circle'}" style="font-size:16px"></i><span>${msg}</span>`;
+}
+
+function resetForm(keepNotif) {
+  ['f-agent','f-type','f-debut','f-fin','f-motif'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('f-duree').value = '';
+  document.getElementById('f-periode').selectedIndex = 0;
+  if (!keepNotif) document.getElementById('f-notif').className = 'hidden';
+}
+
+// ============================================================
+// CALENDAR
+// ============================================================
+function renderCalendar() {
+  document.getElementById('cal-title').textContent = MONTHS[calMonth] + ' ' + calYear;
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(d => `<div class="cal-day-name">${d}</div>`).join('');
+
+  const first = new Date(calYear, calMonth, 1);
+  const dow = (first.getDay() + 6) % 7;
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const today = new Date();
+
+  for (let i = 0; i < dow; i++) {
+    const prev = new Date(calYear, calMonth, 1 - dow + i);
+    grid.innerHTML += `<div class="cal-day other-month">${prev.getDate()}</div>`;
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const evs = demands.filter(x => x.debut <= dateStr && x.fin >= dateStr && x.status !== 'refused');
+    const isToday = today.getFullYear() === calYear && today.getMonth() === calMonth && today.getDate() === d;
+    let cls = 'cal-day';
+    if (isToday) cls += ' today';
+    else if (evs.some(x => x.status === 'pending')) cls += ' has-pending';
+    else if (evs.some(x => x.status === 'approved')) cls += ' has-approved';
+    const dots = evs.map(e => `<div class="event-dot" style="background:${e.status==='pending'?'var(--pending)':'var(--accent)'}"></div>`).join('');
+    grid.innerHTML += `<div class="${cls}">${d}${dots}</div>`;
+  }
+
+  const total = dow + daysInMonth;
+  for (let i = 1; i <= (7 - total % 7) % 7; i++) grid.innerHTML += `<div class="cal-day other-month">${i}</div>`;
+
+  const list = document.getElementById('cal-list');
+  const monthD = demands.filter(d => {
+    const s = new Date(d.debut), e = new Date(d.fin);
+    return (s.getMonth() === calMonth || e.getMonth() === calMonth) && d.status !== 'refused';
+  });
+  if (!monthD.length) { list.innerHTML = '<p style="font-size:13px;color:var(--muted)">Aucune absence ce mois.</p>'; return; }
+  list.innerHTML = monthD.map(d => {
+    const agent = agentsList.find(a => a.id === d.agentId) || {};
+    const initials = d.agentName.split(' ').map(w=>w[0]).join('').substring(0,2);
+    const color = AGENTS_COLORS[agentsList.indexOf(agent) % AGENTS_COLORS.length] || '#888';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="width:30px;height:30px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600;flex-shrink:0">${initials}</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:500">${d.agentName}</div><div style="font-size:11px;color:var(--muted)">${d.type} · ${d.duree}</div></div>
+      <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">${d.debut === d.fin ? d.debut : d.debut + ' → ' + d.fin}</div>
+      ${statusBadge(d.status)}
+    </div>`;
+  }).join('');
+}
+
+function prevMonth() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); }
+function nextMonth() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); }
+function goToday() { const t = new Date(); calYear = t.getFullYear(); calMonth = t.getMonth(); renderCalendar(); }
+
+// ============================================================
+// VALIDATION + M365 ACTIONS
+// ============================================================
+function renderValidation() {
+  const container = document.getElementById('val-container');
+  const pending = demands.filter(d => d.status === 'pending');
+  if (!pending.length) {
+    container.innerHTML = '<div class="notif notif-success"><i class="ti ti-circle-check" style="font-size:16px"></i><span>Toutes les demandes ont été traitées.</span></div>';
+    return;
+  }
+  container.innerHTML = pending.map(d => {
+    const color = AGENTS_COLORS[agentsList.findIndex(a => a.id === d.agentId) % AGENTS_COLORS.length] || '#888';
+    const initials = d.agentName.split(' ').map(w=>w[0]).join('').substring(0,2);
+    return `<div class="card" id="val-${d.id}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:42px;height:42px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:600;flex-shrink:0">${initials}</div>
+          <div><div style="font-size:14px;font-weight:500">${d.agentName}</div><div style="font-size:12px;color:var(--muted)">${d.type} · ${d.duree}</div></div>
+        </div>
+        ${statusBadge(d.status)}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0;background:var(--bg);border-radius:var(--radius-sm);padding:10px 12px">
+        <div><div style="font-size:10px;color:var(--subtle);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Début</div><div style="font-size:13px;font-family:'DM Mono',monospace;margin-top:3px">${d.debut}</div></div>
+        <div><div style="font-size:10px;color:var(--subtle);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Fin</div><div style="font-size:13px;font-family:'DM Mono',monospace;margin-top:3px">${d.fin}</div></div>
+        <div><div style="font-size:10px;color:var(--subtle);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Durée</div><div style="font-size:13px;margin-top:3px">${d.duree}</div></div>
+      </div>
+      ${d.motif ? `<div style="font-size:12px;color:var(--muted);margin-bottom:12px"><i class="ti ti-message" style="vertical-align:-2px"></i> ${d.motif}</div>` : ''}
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" id="btn-approve-${d.id}" onclick="approuver(${d.id})"><i class="ti ti-check"></i>Approuver</button>
+        <button class="btn btn-danger btn-sm" onclick="refuser(${d.id})"><i class="ti ti-x"></i>Refuser</button>
+        <span style="margin-left:auto;font-size:11px;color:var(--muted)"><i class="ti ti-brand-office" style="vertical-align:-2px"></i> Outlook + SharePoint à la validation</span>
+      </div>
+      <div id="m365-feedback-${d.id}" class="hidden"></div>
+    </div>`;
+  }).join('');
+}
+
+async function approuver(id) {
+  const d = demands.find(x => x.id === id);
+  if (!d) return;
+
+  const btn = document.getElementById('btn-approve-' + id);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;border-width:2px;border-color:#fff;border-top-color:transparent"></div>Traitement M365...'; }
+
+  const feedback = document.getElementById('m365-feedback-' + id);
+  let m365Results = [];
+
+  // 1. Créer événement Outlook
+  try {
+    await Graph.createCalendarEvent({
+      subject: `[Congé] ${d.agentName} — ${d.type}`,
+      start: d.debut, end: d.fin,
+      attendeeEmail: d.agentEmail,
+      body: `Demande approuvée. Type: ${d.type}. Durée: ${d.duree}.${d.motif ? '\n\nMotif: ' + d.motif : ''}`
+    });
+    m365Results.push('✓ Événement Outlook créé dans "Absences IT"');
+    saveLog({ action: 'Outlook event created', agent: d.agentName, type: d.type, status: 'success' });
+  } catch(e) {
+    m365Results.push('⚠ Outlook: ' + (e.message || 'Erreur'));
+    saveLog({ action: 'Outlook event failed', agent: d.agentName, error: e.message, status: 'error' });
+  }
+
+  // 2. Mettre à jour Excel SharePoint
+  try {
+    await Graph.appendToSharePointExcel({
+      agent: d.agentName, type: d.type, debut: d.debut,
+      fin: d.fin, duree: d.duree, statut: 'Approuvé'
+    });
+    m365Results.push('✓ Ligne ajoutée dans le fichier Excel SharePoint');
+    saveLog({ action: 'SharePoint Excel updated', agent: d.agentName, status: 'success' });
+  } catch(e) {
+    m365Results.push('⚠ SharePoint: ' + (e.message || 'Erreur'));
+    saveLog({ action: 'SharePoint update failed', agent: d.agentName, error: e.message, status: 'error' });
+  }
+
+  // 3. Envoyer email de notification
+  try {
+    await Graph.sendNotificationEmail({
+      to: d.agentEmail || CONFIG.outlook.managerEmail,
+      subject: `✅ Congé approuvé — ${d.agentName}`,
+      body: `La demande de congé de ${d.agentName} a été approuvée.\n\nType : ${d.type}\nDébut : ${d.debut}\nFin : ${d.fin}\nDurée : ${d.duree}`
+    });
+    m365Results.push('✓ Email de confirmation envoyé');
+    saveLog({ action: 'Email notification sent', agent: d.agentName, status: 'success' });
+  } catch(e) {
+    m365Results.push('⚠ Email: ' + (e.message || 'Erreur'));
+    saveLog({ action: 'Email notification failed', agent: d.agentName, error: e.message, status: 'error' });
+  }
+
+  d.status = 'approved';
+  d.approvedAt = new Date().toISOString();
+  saveDemands();
+  updatePendingCount();
+
+  if (feedback) {
+    feedback.className = 'notif notif-success';
+    feedback.innerHTML = `<i class="ti ti-circle-check" style="font-size:16px;flex-shrink:0"></i><div><strong>Approuvé — Actions M365 exécutées :</strong><br><span style="font-size:12px">${m365Results.join('<br>')}</span></div>`;
+    setTimeout(() => renderValidation(), 3000);
+  }
+}
+
+function refuser(id) {
+  const d = demands.find(x => x.id === id);
+  if (!d) return;
+  d.status = 'refused';
+  saveDemands();
+  updatePendingCount();
+  renderValidation();
+  saveLog({ action: 'Request refused', agent: d.agentName, status: 'refused' });
+}
+
+// ============================================================
+// AGENTS
+// ============================================================
+function renderAgents() {
+  document.getElementById('agents-grid').innerHTML = agentsList.map((a, i) => {
+    const initials = a.displayName.split(' ').map(w=>w[0]).join('').substring(0,2);
+    const agentDemands = demands.filter(d => d.agentId === a.id && d.status === 'approved');
+    const usedDays = agentDemands.reduce((acc, d) => acc + parseInt(d.duree), 0) || 0;
+    return `<div class="agent-card">
+      <div class="agent-avatar" style="background:${AGENTS_COLORS[i % AGENTS_COLORS.length]}">${initials}</div>
+      <div style="font-size:13px;font-weight:500">${a.displayName}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">${a.jobTitle || a.mail || ''}</div>
+      <div style="display:flex;justify-content:center;gap:8px;margin-top:10px">
+        <div style="font-size:11px;background:var(--bg);border-radius:4px;padding:3px 10px;color:var(--muted)">CP <strong style="color:var(--text)">${(a.soldeCP || 25) - usedDays}j</strong></div>
+        <div style="font-size:11px;background:var(--bg);border-radius:4px;padding:3px 10px;color:var(--muted)">RTT <strong style="color:var(--text)">${a.soldeRTT || 5}j</strong></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// M365 STATUS
+// ============================================================
+async function checkM365Status() {
+  const el = document.getElementById('m365-status');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>Vérification en cours...</div>';
+  const checks = [
+    { label: 'Authentification Microsoft (MSAL)', fn: () => Auth.isAuthenticated() },
+    { label: 'API Microsoft Graph', fn: () => Graph.testConnection() },
+    { label: 'Accès calendrier Outlook', fn: () => Graph.testCalendarAccess() },
+    { label: 'Accès fichier SharePoint', fn: () => Graph.testSharePointAccess() },
+    { label: 'Permission Mail.Send', fn: () => Graph.testMailAccess() },
+  ];
+  const results = await Promise.allSettled(checks.map(c => c.fn().catch(e => { throw e; })));
+  el.innerHTML = checks.map((c, i) => {
+    const ok = results[i].status === 'fulfilled' && results[i].value !== false;
+    return `<div class="m365-action-item">
+      <div style="width:18px;height:18px;border-radius:4px;background:${ok?'var(--accent-mid)':'var(--warn)'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i class="ti ${ok?'ti-check':'ti-x'}" style="font-size:11px;color:#fff"></i>
+      </div>
+      <span style="font-size:12px;color:${ok?'var(--accent)':'var(--warn)'}">${c.label}</span>
+      <span style="margin-left:auto;font-size:11px;font-weight:500;color:${ok?'var(--accent)':'var(--warn)'}">${ok?'OK':'Échec'}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderM365Log() {
+  const el = document.getElementById('m365-log');
+  if (!m365Log.length) { el.innerHTML = '<p style="font-size:13px;color:var(--muted)">Aucune action enregistrée.</p>'; return; }
+  el.innerHTML = `<table><thead><tr><th>Date</th><th>Action</th><th>Agent</th><th>Statut</th></tr></thead><tbody>
+    ${m365Log.slice(0,20).map(l => `<tr>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${new Date(l.date).toLocaleString('fr-FR')}</td>
+      <td>${l.action}</td><td>${l.agent || '—'}</td>
+      <td>${l.status==='success'?'<span class="badge badge-approved">OK</span>':l.status==='refused'?'<span class="badge badge-refused">Refusé</span>':'<span class="badge badge-pending">Erreur</span>'}</td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+// Init au chargement — tenter connexion silencieuse
+window.addEventListener('load', async () => {
+  try {
+    const user = await Auth.silentLogin();
+    if (user) { currentUser = user; await initApp(); }
+  } catch(e) { /* pas connecté, afficher login overlay */ }
+});
+</script>
+</body>
+</html>
