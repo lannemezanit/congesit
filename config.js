@@ -10,7 +10,7 @@ const CONFIG = {
   tenantId:  "e7f2c162-fd33-4911-941e-5d1a32fc5309",      // ID de l'annuaire (locataire)
 
   // --- URI de redirection (doit correspondre à Azure AD) ---
-  redirectUri: "https://github.com/lannemezanit/congesit/",
+  redirectUri: "https://lannemezan-it.github.io/congesit/",
 
   // --- SharePoint ---
   sharepoint: {
